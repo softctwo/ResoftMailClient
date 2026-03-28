@@ -1,5 +1,5 @@
-from eas_reader.wbxml.codepages import CODE_PAGES
-from eas_reader.wbxml.models import (
+from eas_client.wbxml.codepages import CODE_PAGES
+from eas_client.wbxml.models import (
     WbxmlDocument,
     WbxmlDecodeError,
     WbxmlElement,
@@ -8,7 +8,7 @@ from eas_reader.wbxml.models import (
     WbxmlOpaque,
     WbxmlText,
 )
-from eas_reader.wbxml.reader import ByteReader
+from eas_client.wbxml.reader import ByteReader
 
 SWITCH_PAGE_TOKEN = 0x00
 END_TOKEN = 0x01
@@ -121,12 +121,10 @@ class _DecoderState:
         tag_token = token & TAG_MASK
         page_tags = CODE_PAGES.get(self.current_page)
         if page_tags is None or tag_token not in page_tags:
-            self._raise_decode_error(
-                token=token,
-                message=f"Unknown WBXML token 0x{token:02X}",
-            )
-
-        tag = page_tags[tag_token]
+            # 容错：跳过未知 token
+            tag = f"_Unknown_page{self.current_page}_0x{tag_token:02X}"
+        else:
+            tag = page_tags[tag_token]
         has_content = bool(token & TAG_CONTENT_FLAG)
         children: list[WbxmlNode] = []
 
