@@ -3,20 +3,20 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "eas-mail-reader"
+name = "eas-cli"
 version = "0.1.0"
-description = "Minimal Exchange ActiveSync mail reader - fetch folders and messages"
+description = "Exchange ActiveSync CLI prototype focused on WBXML correctness"
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31",
 ]
-
-[project.scripts]
-eas-mail-reader = "eas_reader.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["eas_reader*"]
+include = ["eas_client*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

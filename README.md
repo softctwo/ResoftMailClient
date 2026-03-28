@@ -1,106 +1,143 @@
-# eas-mail-reader
+# Resoft EAS Client
 
-极简版 Exchange ActiveSync 邮件客户端，支持读取、Ping 实时推送和发送邮件。
+Cross-system Exchange mail client prototype built around a Python `EAS` core and a
+`Tauri` desktop shell for `macOS` and `Windows`.
 
-## 功能
+Current desktop scope:
 
-- 📬 **邮件读取** — 通过 EAS Sync 协议读取收件箱邮件
-- 🔔 **Ping 实时推送** — 监听新邮件（和 iPhone 邮件客户端相同机制）
-- 📨 **SendMail** — 通过 EAS 协议发送邮件
-- 📁 **文件夹管理** — 列出所有邮箱文件夹
+- account sign-in and local persistence
+- folder list
+- message list
+- message detail reading
+- attachment metadata display only
+- fixed Outlook-style workspace with independent pane scrolling
+- resizable folder/message panes and pane collapse/restore
+- non-mail folders handled safely with a protected empty state
 
-## 快速开始
+Not in scope for the current desktop build:
 
-### 1. 配置
+- attachment download
+- message sending
+- multi-account support
+- full-text search
 
-创建 `.env.eas` 文件：
+The repository also keeps the low-level CLI and `EWS` probing commands used during
+protocol verification.
 
-```bash
-EAS_SERVER=mail.example.com
-EAS_USERNAME=DOMAIN\\username
-EAS_PASSWORD=your-password
-EAS_ACCOUNT_EMAIL=username@example.com
-EAS_DEVICE_ID=OPENCLAW001
-EAS_DEVICE_TYPE=iPhone
-EAS_USER_AGENT=Apple-iOS/17.0
-EAS_VERIFY_TLS=false
-```
+## Environment
 
-### 2. 安装依赖
-
-```bash
-pip install requests beautifulsoup4
-```
-
-### 3. 读取邮件
-
-```python
-from eas_reader.config import ClientConfig
-from eas_reader.eas.commands import build_sync_request
-from eas_reader.eas.parsers import parse_sync_response
-from eas_reader.transport import EasTransport
-
-config = ClientConfig.from_env()
-transport = EasTransport(config)
-
-# 同步收件箱
-resp = transport.post("Sync", build_sync_request(
-    collection_id="14", sync_key="0", window_size=10,
-))
-result = parse_sync_response(resp)
-for msg in result.messages:
-    print(f"{msg.sender}: {msg.subject}")
-```
-
-### 4. Ping 实时推送
+Set the connection values in the shell before running live commands:
 
 ```bash
-python examples/ping_demo.py
+export EAS_SERVER="mail.example.com"
+export EAS_USERNAME="DOMAIN\\user"
+export EAS_PASSWORD="..."
+export EAS_ACCOUNT_EMAIL="user@example.com"
 ```
 
-### 5. 发送邮件
+Optional:
 
 ```bash
-python examples/sendmail_demo.py user@example.com "主题" "正文"
+export EAS_DEVICE_ID="PYEASCLI001"
+export EAS_DEVICE_TYPE="PythonEAS"
+export EAS_USER_AGENT="Apple-iOS/17.0"
 ```
 
-或在代码中：
+Optional EWS override:
 
-```python
-from examples.sendmail_demo import send_email
-
-send_email(
-    to="user@example.com",
-    subject="测试邮件",
-    body="这是通过 EAS 协议发送的邮件",
-)
+```bash
+export EWS_ENDPOINT_PATH="/EWS/Exchange.asmx"
 ```
 
-## 技术细节
+## CLI Commands
 
-### EAS Ping 实时推送
+List folders:
 
-Ping 机制模拟 iPhone 邮件客户端的"推送"功能：
+```bash
+python -m eas_client.cli folders
+```
 
-1. 完整握手：Provision → FolderSync → Sync
-2. 发送 Ping 请求（指定心跳间隔）
-3. 服务器保持连接，新邮件到达时立即响应
-4. 客户端收到通知后 Sync 拉取新邮件
+List recent messages for a collection:
 
-### EAS SendMail
+```bash
+python -m eas_client.cli messages --collection-id COLLECTION_ID
+```
 
-通过 EAS 12.1 协议发送 MIME 格式邮件：
+Read one message detail plus attachment metadata:
 
-1. 构造标准 MIME 邮件
-2. Content-Type 设为 `message/rfc822`
-3. POST 到 `/Microsoft-Server-ActiveSync?Cmd=SendMail`
+```bash
+python -m eas_client.cli message-detail --collection-id COLLECTION_ID --server-id SERVER_ID
+```
 
-## EAS 协议版本
+Emit machine-readable JSON for bridge callers:
 
-- 支持 2.5 / 12.0 / 12.1 / 14.0 / 14.1
-- Ping 和 Sync 使用 14.0
-- SendMail 使用 12.1（MIME 格式）
+```bash
+python -m eas_client.cli folders --json
+python -m eas_client.cli messages --collection-id COLLECTION_ID --json
+python -m eas_client.cli message-detail --collection-id COLLECTION_ID --server-id SERVER_ID --json
+```
 
-## 许可证
+Inspect the effective EAS mobile policy:
 
-MIT
+```bash
+python -m eas_client.cli provision
+```
+
+List recent inbox messages through EWS:
+
+```bash
+python -m eas_client.cli ews-find-items --max-items 10
+```
+
+Fetch one message and its attachment metadata through EWS:
+
+```bash
+python -m eas_client.cli ews-get-item --item-id ITEM_ID
+```
+
+Download one EWS attachment by attachment id:
+
+```bash
+python -m eas_client.cli ews-download-attachment --attachment-id ATTACHMENT_ID --output tmp/file.bin
+```
+
+Dump raw WBXML from a live command:
+
+```bash
+python -m eas_client.cli dump-wbxml --command folder-sync --output tmp/foldersync.wbxml
+```
+
+Decode a saved WBXML file:
+
+```bash
+python -m eas_client.cli decode-wbxml tests/samples/foldersync_response.wbxml
+```
+
+## Desktop App
+
+The desktop shell lives in `desktop/README.md`.
+
+Quick start:
+
+```bash
+cd desktop
+npm install
+npm run tauri dev
+```
+
+Desktop persistence behavior:
+
+- account settings are stored in the Tauri app config directory
+- mailbox password is stored in the system keychain, not in `account.json`
+- the latest folders, message lists, and message details are cached locally for faster cold starts
+
+## Verification
+
+Core verification commands:
+
+```bash
+PYTHONPATH=src pytest -q
+cd desktop && npm run build
+cd desktop/src-tauri && cargo test --test storage
+cd desktop/src-tauri && cargo check
+```
