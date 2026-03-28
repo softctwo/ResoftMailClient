@@ -279,4 +279,16 @@ CODE_PAGES: dict[int, dict[int, str]] = {
         0x13: "MeetingMessageType",
         0x14: "IsDraft",
     },
+    # Ping code page (13) - matches Exchange server response
+    13: {
+        0x05: "Ping",
+        0x06: "AutdDiscover",
+        0x07: "Status",
+        0x08: "HeartbeatInterval",
+        0x09: "Folders",
+        0x0A: "Folder",
+        0x0B: "Id",
+        0x0C: "Class",
+        0x0D: "MaxFolders",
+    },
 }

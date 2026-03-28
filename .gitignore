@@ -5,3 +5,13 @@ __pycache__/
 dist/
 build/
 .DS_Store
+.env.eas
+__pycache__/
+*.pyc
+last_seen_ids.txt
+daemon_state.json
+__pycache__/
+*.pyc
+last_seen_ids.txt
+daemon_state.json
+.env.eas
