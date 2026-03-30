@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 
 import requests
 
-from eas_reader.config import ClientConfig
+from eas_client.config import ClientConfig
 
 
 class EasTransport:

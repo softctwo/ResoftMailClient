@@ -8,10 +8,10 @@ import os
 import sys
 from dataclasses import asdict, is_dataclass
 
-from eas_reader.config import ClientConfig
-from eas_reader.eas.commands import build_folder_sync_request, build_sync_request
-from eas_reader.eas.parsers import parse_folder_sync_response, parse_sync_response
-from eas_reader.transport import EasTransport
+from eas_client.config import ClientConfig
+from eas_client.eas.commands import build_folder_sync_request, build_sync_request
+from eas_client.eas.parsers import parse_folder_sync_response, parse_sync_response
+from eas_client.transport import EasTransport
 
 
 def build_parser() -> argparse.ArgumentParser:

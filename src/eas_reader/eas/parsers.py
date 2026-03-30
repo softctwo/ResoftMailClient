@@ -1,6 +1,6 @@
 import base64
 
-from eas_reader.eas.models import (
+from eas_client.eas.models import (
     AttachmentFetchResult,
     AttachmentSummary,
     FolderSummary,
@@ -10,7 +10,7 @@ from eas_reader.eas.models import (
     ProvisionResponse,
     SyncResponse,
 )
-from eas_reader.wbxml import WbxmlElement, WbxmlOpaque, WbxmlText, decode_document
+from eas_client.wbxml import WbxmlElement, WbxmlOpaque, WbxmlText, decode_document
 
 
 def parse_folder_sync_response(payload: bytes) -> FolderSyncResponse:

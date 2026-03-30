@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -8,6 +9,13 @@ class AttachmentSummary:
     method: str | None
     size: int | None = None
     content_type: str | None = None
+
+
+@dataclass(frozen=True)
+class AttachmentFetchResult:
+    content: bytes | None = None
+    content_type: str | None = None
+    display_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -34,6 +42,22 @@ class MessageSummary:
 
 
 @dataclass(frozen=True)
+class MessageDetail:
+    server_id: str
+    subject: str | None = None
+    sender: str | None = None
+    received_at: str | None = None
+    body: str | None = None
+    attachments: list[AttachmentSummary] | None = None
+
+
+@dataclass(frozen=True)
 class SyncResponse:
     sync_key: str
     messages: list[MessageSummary]
+
+
+@dataclass(frozen=True)
+class ProvisionResponse:
+    policy_key: str | None = None
+    policy_data: Any | None = None

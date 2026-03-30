@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from eas_reader.wbxml.codepages import CODE_PAGES
+from eas_client.wbxml.codepages import CODE_PAGES
 
 WBXML_HEADER = bytes([0x03, 0x01, 0x6A, 0x00])
 SWITCH_PAGE_TOKEN = 0x00

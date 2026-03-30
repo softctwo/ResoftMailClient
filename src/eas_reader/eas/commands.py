@@ -1,4 +1,4 @@
-from eas_reader.eas.encoder import WbxmlRequestElement, encode_document
+from eas_client.eas.encoder import WbxmlRequestElement, encode_document
 
 AIRSYNC_PAGE = 0
 FOLDER_HIERARCHY_PAGE = 7
