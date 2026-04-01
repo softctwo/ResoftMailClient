@@ -23,6 +23,6 @@ def load_env(env_path: str | Path | None = None) -> Path:
 
 def add_import_path() -> Path:
     base_dir = Path(__file__).resolve().parent
-    src_root = base_dir / "src" / "eas_reader"
+    src_root = base_dir / "src"
     sys.path.insert(0, str(src_root))
     return src_root

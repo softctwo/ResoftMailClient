@@ -4,3 +4,4 @@ __pycache__/
 mail_archive/
 daemon_state.json
 last_seen_ids.txt
+assistant_data/

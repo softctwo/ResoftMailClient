@@ -21,10 +21,10 @@ ResoftMailClient 是面向公司 Exchange / EAS 邮箱场景的邮件助手项�
 
 ```bash
 EAS_SERVER=mail.resoftcss.com.cn
-EAS_USERNAME=RESOFT\zhangyanlong
+EAS_USERNAME=RESOFT\用户名
 EAS_PASSWORD=你的密码
-EAS_ACCOUNT_EMAIL=zhangyanlong@resoftcss.com.cn
-EAS_DEVICE_ID=PYEASCLI001
+EAS_ACCOUNT_EMAIL=用户名@resoftcss.com.cn
+EAS_DEVICE_ID=你的设备ID
 EAS_VERIFY_TLS=false
 EAS_DEVICE_TYPE=PythonEAS
 EAS_USER_AGENT=Apple-iOS/17.0
@@ -96,6 +96,8 @@ python3 mail_assistant.py morning-report --limit 50 --hours 24
 ```bash
 assistant_data/reports/morning_digest_YYYY-MM-DD.md
 ```
+
+`assistant_data/` 下的状态、缓存和晨报均为本地运行产物，默认不纳入版本控制。
 
 ### 2）轮询新邮件
 
