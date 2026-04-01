@@ -223,7 +223,40 @@ python3 mail_assistant.py reminders --limit 50
 - 立项类邮件优先提炼：项目名称、编号、范围、预算、负责人、风险点
 - 报销/待办类邮件优先判断：是否需要当天处理
 
-## 八、验证命令
+## 八、OpenClaw Cron 使用示例
+
+当前项目已配置两个 OpenClaw 内部定时任务：
+
+### 1）每 10 分钟轮询邮件
+- 名称：`resoft-mail-poll`
+- 作用：检查公司邮箱新邮件，按既定优先级输出摘要
+- 当前已开启失败告警：连续失败 1 次即告警，冷却 30 分钟
+
+### 2）工作日每天 9:00 生成晨报
+- 名称：`resoft-mail-morning-report`
+- 作用：汇总最近 24 小时邮件并输出晨报
+- 时区：`Asia/Shanghai`
+- 当前已开启失败告警：连续失败 1 次即告警，冷却 30 分钟
+
+查看任务：
+
+```bash
+openclaw cron list --json
+```
+
+手动执行一次轮询任务：
+
+```bash
+openclaw cron run 23abf02f-d94b-4b27-897b-2e5a5ffa6ffe
+```
+
+手动执行一次晨报任务：
+
+```bash
+openclaw cron run aa7b1b83-dbfb-49dc-9f06-e11ed0bc262f
+```
+
+## 九、验证命令
 
 建议在变更后执行：
 
