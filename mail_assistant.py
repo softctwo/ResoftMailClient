@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""龙哥邮件助手：增量拉取、分类、晨报生成。"""
+"""龙哥邮件助手：增量拉取、分类、晨报生成、智能提醒。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,9 @@ from dataclasses import asdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from analysis_rules import classify
 from eas_env import add_import_path, load_env
+from mail_actions import build_alerts, build_intelligence, build_reminders
 from time_utils import to_beijing_time
 
 load_env()
@@ -35,20 +37,6 @@ DATA_DIR = BASE_DIR / "assistant_data"
 STATE_FILE = DATA_DIR / "assistant_state.json"
 MAILBOX_FILE = DATA_DIR / "latest_messages.json"
 REPORT_DIR = DATA_DIR / "reports"
-
-APPROVAL_KEYWORDS = [
-    "立项", "审批", "待办", "待审批", "打回", "报销",
-    "项目结论", "变更", "验收", "合同", "预算", "紧急", "urgent",
-]
-
-CATEGORY_RULES = [
-    (["打回", "报销", "借款审批"], "财务报销", "🔴"),
-    (["立项", "立项结论", "预立项", "工程立项"], "立项审批", "🟠"),
-    (["客户到访", "提前进场", "提前实施"], "商务协同", "🟠"),
-    (["制度", "监管", "EAST", "反洗钱", "利率报备", "数据治理"], "监管制度", "🟡"),
-    (["周报", "日报", "月报"], "周报日报", "🟢"),
-    (["收入", "合同负债", "计划收入"], "经营统计", "🟡"),
-]
 
 
 def ensure_dirs() -> None:
@@ -80,10 +68,12 @@ def get_transport() -> EasTransport:
     config = ClientConfig.from_env()
     transport = EasTransport(config)
     resp1 = transport.post("Provision", build_provision_request())
-    if not re.findall(rb"\x03(\d{8,})\x00", resp1):
+    keys1 = re.findall(rb"\x03(\d{8,})\x00", resp1)
+    if not keys1:
         raise RuntimeError("Provision 第一步失败")
-    resp2 = transport.post("Provision", build_provision_request(policy_key=re.findall(rb"\x03(\d{8,})\x00", resp1)[0].decode()))
-    if not re.findall(rb"\x03(\d{8,})\x00", resp2):
+    resp2 = transport.post("Provision", build_provision_request(policy_key=keys1[0].decode()))
+    keys2 = re.findall(rb"\x03(\d{8,})\x00", resp2)
+    if not keys2:
         raise RuntimeError("Provision 第二步失败")
     return transport
 
@@ -99,15 +89,6 @@ def get_inbox_id(transport: EasTransport, state: dict) -> str:
             save_state(state)
             return folder.server_id
     raise RuntimeError("未找到收件箱")
-
-
-def classify(subject: str, sender: str) -> tuple[str, str, bool]:
-    text = f"{subject} {sender}".lower()
-    approval = any(keyword.lower() in text for keyword in APPROVAL_KEYWORDS)
-    for keywords, category, priority in CATEGORY_RULES:
-        if any(keyword.lower() in text for keyword in keywords):
-            return category, priority, approval
-    return "其他", "⚪", approval
 
 
 def fetch_recent_messages(limit: int = 30, include_body: bool = False) -> list[dict]:
@@ -153,7 +134,7 @@ def fetch_recent_messages(limit: int = 30, include_body: bool = False) -> list[d
                 )
             )
             body = detail.body or ""
-            item["body_preview"] = re.sub(r"\s+", " ", body)[:300]
+            item["body_preview"] = re.sub(r"\s+", " ", body)[:500]
         results.append(item)
 
     state["last_server_ids"] = [item["server_id"] for item in results]
@@ -279,18 +260,39 @@ def run_morning_report(limit: int = 50, hours: int = 24) -> dict:
     }
 
 
+def run_alerts(limit: int = 30) -> dict:
+    messages = fetch_recent_messages(limit=limit, include_body=True)
+    return build_alerts(messages)
+
+
+def run_intelligence(limit: int = 50) -> dict:
+    messages = fetch_recent_messages(limit=limit, include_body=True)
+    return build_intelligence(messages)
+
+
+def run_reminders(limit: int = 50) -> dict:
+    messages = fetch_recent_messages(limit=limit, include_body=True)
+    return build_reminders(messages)
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="龙哥邮件助手")
-    parser.add_argument("action", choices=["poll", "morning-report"])
+    parser.add_argument("action", choices=["poll", "morning-report", "alerts", "intelligence", "reminders"])
     parser.add_argument("--limit", type=int, default=30)
     parser.add_argument("--hours", type=int, default=24)
     args = parser.parse_args()
 
     if args.action == "poll":
         print(json.dumps(run_poll(limit=args.limit), ensure_ascii=False, indent=2))
-    else:
+    elif args.action == "morning-report":
         result = run_morning_report(limit=args.limit, hours=args.hours)
         print(result["text"])
         print(f"\n报告已写入: {result['report_path']}")
+    elif args.action == "alerts":
+        print(json.dumps(run_alerts(limit=args.limit), ensure_ascii=False, indent=2))
+    elif args.action == "intelligence":
+        print(json.dumps(run_intelligence(limit=args.limit), ensure_ascii=False, indent=2))
+    else:
+        print(json.dumps(run_reminders(limit=args.limit), ensure_ascii=False, indent=2))
