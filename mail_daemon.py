@@ -50,7 +50,7 @@ def notify_feishu(new_messages: list[dict]) -> None:
         lines.append(
             f"• [{msg.get('category', '其他')}] {msg.get('subject', '(无主题)')}\n"
             f"  来自: {msg.get('sender', '(未知)')}\n"
-            f"  时间: {msg.get('received_at', '')}"
+            f"  时间: {msg.get('received_at', '')}（北京时间）"
         )
 
     content = "\n".join(lines)

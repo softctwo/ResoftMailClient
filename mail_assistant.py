@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from eas_env import add_import_path, load_env
+from time_utils import to_beijing_time
 
 load_env()
 add_import_path()
@@ -137,7 +138,8 @@ def fetch_recent_messages(limit: int = 30, include_body: bool = False) -> list[d
             "server_id": message.server_id,
             "subject": subject,
             "sender": sender,
-            "received_at": message.received_at,
+            "received_at": to_beijing_time(message.received_at),
+            "received_at_raw": message.received_at,
             "category": category,
             "priority": priority,
             "needs_attention": needs_attention,
@@ -171,7 +173,7 @@ def build_digest(messages: list[dict], hours: int = 12) -> dict:
     window_start = now - timedelta(hours=hours)
     selected = []
     for item in messages:
-        raw = item.get("received_at")
+        raw = item.get("received_at_raw") or item.get("received_at")
         if not raw:
             continue
         try:
@@ -240,7 +242,7 @@ def format_digest_text(digest: dict) -> str:
     lines.extend(["", "## 五、重要邮件摘要"])
     if digest["important"]:
         for item in digest["important"][:5]:
-            lines.append(f"- {item['priority']} {item['subject']} | {item['sender']} | {item.get('received_at', '')}")
+            lines.append(f"- {item['priority']} {item['subject']} | {item['sender']} | {item.get('received_at', '')}（北京时间）")
     else:
         lines.append("- 无")
 

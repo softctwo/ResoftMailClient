@@ -1,0 +1,89 @@
+[
+  {
+    "server_id": "14:1",
+    "subject": "收入执行统计表 - 2026年03月31日-截止月底实际完成",
+    "sender": "\"王咸青\" <wang18656560136@163.com>",
+    "received_at": "2026-04-01 17:44:04",
+    "received_at_raw": "2026-04-01T09:44:04.002Z",
+    "category": "经营统计",
+    "priority": "🟡",
+    "needs_attention": false,
+    "attachments": [
+      {
+        "display_name": "当月收入执行表_2026-03-31.csv",
+        "file_reference": "14%3a1%3a0",
+        "method": "1",
+        "size": 17693,
+        "content_type": null
+      }
+    ]
+  },
+  {
+    "server_id": "14:2",
+    "subject": "工程序列-截止3月",
+    "sender": "\"财务机器人\" <zhengxuelian@resoftcss.com.cn>",
+    "received_at": "2026-04-01 17:11:18",
+    "received_at_raw": "2026-04-01T09:11:18.487Z",
+    "category": "其他",
+    "priority": "⚪",
+    "needs_attention": false,
+    "attachments": [
+      {
+        "display_name": "2026年预算执行套表_工程-2026-03.xlsx",
+        "file_reference": "14%3a2%3a0",
+        "method": "1",
+        "size": 1227286,
+        "content_type": null
+      }
+    ]
+  },
+  {
+    "server_id": "14:3",
+    "subject": "票据事业部序列-截止3月",
+    "sender": "\"财务机器人\" <zhengxuelian@resoftcss.com.cn>",
+    "received_at": "2026-04-01 17:10:25",
+    "received_at_raw": "2026-04-01T09:10:25.860Z",
+    "category": "其他",
+    "priority": "⚪",
+    "needs_attention": false,
+    "attachments": [
+      {
+        "display_name": "2026年预算执行套表_票据事业部-2026-03.xlsx",
+        "file_reference": "14%3a3%3a0",
+        "method": "1",
+        "size": 787739,
+        "content_type": null
+      }
+    ]
+  },
+  {
+    "server_id": "14:4",
+    "subject": "答复: 第一批研发人员名单",
+    "sender": "\"刘岩\" <liuyan@resoftcss.com.cn>",
+    "received_at": "2026-04-01 17:05:20",
+    "received_at_raw": "2026-04-01T09:05:20.442Z",
+    "category": "其他",
+    "priority": "⚪",
+    "needs_attention": false,
+    "attachments": []
+  },
+  {
+    "server_id": "14:5",
+    "subject": "附件发送验证-1775033247",
+    "sender": "\"张彦龙\" <zhangyanlong@resoftcss.com.cn>",
+    "received_at": "2026-04-01 16:46:58",
+    "received_at_raw": "2026-04-01T08:46:58.012Z",
+    "category": "其他",
+    "priority": "⚪",
+    "needs_attention": false,
+    "attachments": [
+      {
+        "display_name": "tmp_attachment_test.txt",
+        "file_reference": "14%3a5%3a0",
+        "method": "1",
+        "size": 473,
+        "content_type": null
+      }
+    ]
+  }
+]

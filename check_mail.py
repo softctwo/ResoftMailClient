@@ -10,6 +10,7 @@ from pathlib import Path
 warnings.filterwarnings("ignore")
 
 from eas_env import add_import_path, load_env
+from time_utils import to_beijing_time
 
 load_env()
 add_import_path()
@@ -77,7 +78,8 @@ def main():
                 "server_id": mid,
                 "subject": msg.subject or "(无主题)",
                 "sender": msg.sender or "(未知)",
-                "received_at": msg.received_at or "",
+                "received_at": to_beijing_time(msg.received_at),
+                "received_at_raw": msg.received_at or "",
             })
 
     # 更新缓存
