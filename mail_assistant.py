@@ -13,7 +13,7 @@ from pathlib import Path
 from analysis_rules import classify
 from eas_env import add_import_path, load_env
 from mail_actions import build_alerts, build_intelligence, build_reminders
-from time_utils import to_beijing_time
+from time_utils import SHANGHAI_TZ, parse_mail_datetime, to_beijing_time
 
 load_env()
 add_import_path()
@@ -150,18 +150,17 @@ def detect_new_messages(current: list[dict], previous: list[dict]) -> list[dict]
 
 
 def build_digest(messages: list[dict], hours: int = 12) -> dict:
-    now = datetime.now()
+    now = datetime.now(SHANGHAI_TZ)
     window_start = now - timedelta(hours=hours)
     selected = []
     for item in messages:
         raw = item.get("received_at_raw") or item.get("received_at")
         if not raw:
             continue
-        try:
-            dt = datetime.fromisoformat(raw.replace("Z", "+00:00")).replace(tzinfo=None)
-        except ValueError:
+        dt = parse_mail_datetime(raw)
+        if dt is None:
             continue
-        if dt >= window_start:
+        if dt.astimezone(SHANGHAI_TZ) >= window_start:
             selected.append(item)
 
     selected.sort(key=lambda item: item.get("received_at", ""), reverse=True)
@@ -260,18 +259,56 @@ def run_morning_report(limit: int = 50, hours: int = 24) -> dict:
     }
 
 
+def enrich_candidate_bodies(messages: list[dict]) -> list[dict]:
+    candidates = []
+    for item in messages:
+        category = item.get("category")
+        subject = item.get("subject", "")
+        if category in {"立项审批", "监管制度", "经营统计"}:
+            candidates.append(item)
+            continue
+        if any(keyword in subject for keyword in ["客户到访", "提前进场", "提前实施", "截止", "到期"]):
+            candidates.append(item)
+
+    if not candidates:
+        return messages
+
+    state = load_state()
+    transport = get_transport()
+    inbox_id = get_inbox_id(transport, state)
+    by_id = {item["server_id"]: dict(item) for item in messages}
+
+    for item in candidates[:12]:
+        try:
+            detail = parse_item_operations_message_response(
+                transport.post(
+                    "ItemOperations",
+                    build_item_operations_message_request(collection_id=inbox_id, server_id=item["server_id"]),
+                )
+            )
+            body = detail.body or ""
+            by_id[item["server_id"]]["body_preview"] = re.sub(r"\s+", " ", body)[:500]
+        except Exception:
+            by_id[item["server_id"]].setdefault("body_preview", "")
+
+    return list(by_id.values())
+
+
 def run_alerts(limit: int = 30) -> dict:
-    messages = fetch_recent_messages(limit=limit, include_body=True)
+    messages = fetch_recent_messages(limit=limit, include_body=False)
+    messages = enrich_candidate_bodies(messages)
     return build_alerts(messages)
 
 
 def run_intelligence(limit: int = 50) -> dict:
-    messages = fetch_recent_messages(limit=limit, include_body=True)
+    messages = fetch_recent_messages(limit=limit, include_body=False)
+    messages = enrich_candidate_bodies(messages)
     return build_intelligence(messages)
 
 
 def run_reminders(limit: int = 50) -> dict:
-    messages = fetch_recent_messages(limit=limit, include_body=True)
+    messages = fetch_recent_messages(limit=limit, include_body=False)
+    messages = enrich_candidate_bodies(messages)
     return build_reminders(messages)
 
 
