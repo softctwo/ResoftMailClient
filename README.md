@@ -146,9 +146,79 @@ python3 mail_daemon.py
 
 如果一定要在 shell 中导入环境变量，请不要使用 `source .env.eas` 这一方式。
 
-定时能力建议：
+## Mail Timezone
+
+邮件原始时间通常来自 Exchange 的 UTC 时间（如 `2026-04-01T09:44:04.002Z`）。
+当前项目已统一在展示层转换为 **北京时间（Asia/Shanghai）**：
+
+- 用户可见字段：`received_at`（北京时间）
+- 保留原始字段：`received_at_raw`（UTC 原始值）
+
+这样既能保证展示时间正确，也不会影响内部去重和兼容逻辑。
+
+## Attachment Sending
+
+`send_mail.py` 已支持普通文本邮件和带附件邮件发送。
+
+普通发信：
+
+```bash
+python3 send_mail.py --to someone@example.com --subject "主题" --body "正文"
+```
+
+带附件发信：
+
+```bash
+python3 send_mail.py --to someone@example.com --subject "主题" --body "正文" --attach ./file1.pdf
+```
+
+多附件：
+
+```bash
+python3 send_mail.py --to someone@example.com --subject "主题" --body "正文" --attach ./file1.pdf --attach ./file2.xlsx
+```
+
+## Morning Digest
+
+`mail_assistant.py morning-report` 用于生成晨报，默认可汇总最近 24 小时的重要邮件，并输出：
+
+- 待关注事项
+- 报销/打回提醒
+- 客户到访/商务协同
+- 分类统计
+- 重要邮件摘要
+
+示例：
+
+```bash
+python3 mail_assistant.py morning-report --limit 50 --hours 24
+```
+
+晨报文件会写入：
+
+```bash
+assistant_data/reports/morning_digest_YYYY-MM-DD.md
+```
+
+## Scheduled Polling
+
+项目已内置轮询与晨报脚本，适合配合 OpenClaw cron 使用，不依赖 macOS 系统级调度。
+
+建议任务：
 - 每 10 分钟轮询新邮件：`run_mail_monitor.sh`
-- 每天晨报：`run_morning_report.sh`
+- 每天固定时间生成晨报：`run_morning_report.sh`
+
+手动启动轮询守护：
+
+```bash
+python3 mail_daemon.py
+```
+
+轮询脚本会：
+- 拉取最新邮件
+- 自动分类
+- 识别新邮件
+- 预留飞书通知能力
 
 ## Verification
 
