@@ -8,28 +8,18 @@ EAS 邮件管理器
 """
 
 import json
-import os
 import re
 import sys
-import time
 import warnings
-import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
-# 加载环境变量
-env_file = Path(__file__).parent / ".env.eas"
-if env_file.exists():
-    for line in env_file.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip())
+from eas_env import add_import_path, load_env
 
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+load_env()
+add_import_path()
 
 from eas_client.config import ClientConfig
 from eas_client.eas.commands import (
@@ -44,7 +34,11 @@ from eas_client.eas.parsers import (
     parse_item_operations_message_response,
 )
 from eas_client.transport import EasTransport
-from bs4 import BeautifulSoup
+
+try:
+    from bs4 import BeautifulSoup
+except ModuleNotFoundError:
+    BeautifulSoup = None
 
 # ========== 路径配置 ==========
 ARCHIVE_DIR = Path(__file__).parent / "mail_archive"
@@ -126,14 +120,19 @@ def make_mail_filename(msg) -> str:
 
 
 def get_transport():
-    """获取带 PolicyKey 的 transport"""
+    """获取 transport，并完成 Provision 以兼容后续发送动作。"""
     config = ClientConfig.from_env()
     transport = EasTransport(config)
-    # Provision
     resp = transport.post("Provision", build_provision_request())
-    pk1 = re.findall(rb'\x03(\d{8,})\x00', resp)[0].decode()
-    resp = transport.post("Provision", build_provision_request(policy_key=pk1))
-    pk2 = re.findall(rb'\x03(\d{8,})\x00', resp)[-1].decode()
+    pk1_list = re.findall(rb'\x03(\d{8,})\x00', resp)
+    if not pk1_list:
+        raise RuntimeError("Provision 第一步未返回 PolicyKey")
+
+    resp = transport.post("Provision", build_provision_request(policy_key=pk1_list[0].decode()))
+    pk2_list = re.findall(rb'\x03(\d{8,})\x00', resp)
+    if not pk2_list:
+        raise RuntimeError("Provision 第二步未返回 PolicyKey")
+
     return transport
 
 
@@ -192,7 +191,7 @@ def download_email_body(transport, server_id: str, collection_id="14") -> dict:
         result = parse_item_operations_message_response(resp)
         
         body = result.body or ""
-        if "<html" in body.lower():
+        if "<html" in body.lower() and BeautifulSoup is not None:
             soup = BeautifulSoup(body, "html.parser")
             text = soup.get_text(separator="\n", strip=True)
         else:

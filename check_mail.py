@@ -2,24 +2,17 @@
 """EAS 邮件检查脚本 - 检测新邮件并输出 JSON"""
 
 import json
-import os
 import sys
 import time
 import warnings
-warnings.filterwarnings('ignore')
 from pathlib import Path
 
-# 加载 .env.eas
-env_file = Path(__file__).parent / ".env.eas"
-if env_file.exists():
-    for line in env_file.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip())
+warnings.filterwarnings("ignore")
 
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+from eas_env import add_import_path, load_env
+
+load_env()
+add_import_path()
 
 from eas_client.config import ClientConfig
 from eas_client.eas.commands import build_folder_sync_request, build_sync_request

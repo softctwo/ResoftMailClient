@@ -1,7 +1,6 @@
-# Resoft EAS Client
+# ResoftMailClient
 
-Cross-system Exchange mail client prototype built around a Python `EAS` core and a
-`Tauri` desktop shell for `macOS` and `Windows`.
+ResoftMailClient is a cross-system Exchange mail client built around a Python `EAS` core and supporting automation scripts for sync, digest, and send workflows.
 
 Current desktop scope:
 
@@ -130,6 +129,26 @@ Desktop persistence behavior:
 - account settings are stored in the Tauri app config directory
 - mailbox password is stored in the system keychain, not in `account.json`
 - the latest folders, message lists, and message details are cached locally for faster cold starts
+
+## Quick Scripts
+
+推荐直接使用仓库根目录下的脚本，它们会自行读取 `.env.eas`，避免 shell `source .env.eas` 时把 `RESOFT\zhangyanlong` 中的反斜杠吞掉：
+
+```bash
+python3 check_mail.py
+python3 mail_manager.py sync-incremental
+python3 send_mail.py --to zhangyanlong@resoftcss.com.cn --subject "测试" --body "正文"
+python3 send_mail.py --to zhangyanlong@resoftcss.com.cn --subject "测试" --body "正文" --attach ./tmp_attachment_test.txt
+python3 mail_assistant.py poll --limit 30
+python3 mail_assistant.py morning-report --limit 50 --hours 24
+python3 mail_daemon.py
+```
+
+如果一定要在 shell 中导入环境变量，请不要使用 `source .env.eas` 这一方式。
+
+定时能力建议：
+- 每 10 分钟轮询新邮件：`run_mail_monitor.sh`
+- 每天晨报：`run_morning_report.sh`
 
 ## Verification
 
