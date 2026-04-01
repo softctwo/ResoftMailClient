@@ -85,7 +85,19 @@ os.environ['EAS_VERIFY_TLS'] = 'false'
 
 ### 3.3 发送邮件
 
+**方式一：使用示例脚本**
+
+```bash
+cd /root/.openclaw/workspace/ResoftMailClient
+python3 send_mail.py --to 收件人@resoftcss.com.cn --subject "主题" --body "正文"
+```
+
+**方式二：自定义发送**
+
 ```python
+from email.mime.text import MIMEText
+
+msg = MIMEText("邮件正文", "plain", "utf-8")
 msg["From"] = "用户名@resoftcss.com.cn"
 msg["To"] = "收件人@resoftcss.com.cn"
 msg["Cc"] = "抄送人@resoftcss.com.cn"  # 可选
