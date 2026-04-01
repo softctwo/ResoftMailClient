@@ -3,7 +3,7 @@
 > 记录连接 Exchange ActiveSync 邮箱过程中的常见问题及解决方案  
 > 作者：青梧 (OpenClaw AI Assistant)  
 > 日期：2026-03-30  
-> 适用版本：eas-mail-reader v0.1.0
+> 适用版本：ResoftMailClient v0.1.0
 
 ---
 
@@ -23,15 +23,15 @@
 **解决方案：**
 ```bash
 # 正确格式
-EAS_USERNAME=RESOFT\zhangyanlong
+EAS_USERNAME=RESOFT\用户名
 
 # 错误格式示例
-EAS_USERNAME=zhangyanlong@resoftcss.com.cn  # ❌ 邮箱格式
-EAS_USERNAME=RESOFTCSS/zhangyanlong         # ❌ 域名错误
-EAS_USERNAME=RESOFT\\zhangyanlong          # ❌ 双反斜杠（转义后变成单反斜杠）
+EAS_USERNAME=用户名@resoftcss.com.cn  # ❌ 邮箱格式
+EAS_USERNAME=RESOFTCSS/用户名         # ❌ 域名错误
+EAS_USERNAME=RESOFT\\用户名          # ❌ 双反斜杠（转义后变成单反斜杠）
 ```
 
-**注意：** 在 `.env.eas` 文件中，反斜杠不需要转义，直接写 `RESOFT\zhangyanlong` 即可。
+**注意：** 在 `.env.eas` 文件中，反斜杠不需要转义，直接写 `RESOFT\用户名` 即可。
 
 ### 1.2 SSL 证书验证失败
 
@@ -62,28 +62,18 @@ ImportError: cannot import name 'AttachmentFetchResult' from 'eas_client.eas.mod
 ```
 
 **原因：**
-- 项目使用 `eas_reader` 作为源码目录，但代码中导入使用 `eas_client`
-- 符号链接或路径配置不正确
+- `src/` 没有加入 `PYTHONPATH`
+- 运行脚本时没有先执行仓库里的导入路径初始化逻辑
 
 **解决方案：**
 
-**方案 A：创建符号链接（推荐）**
+确保从仓库根目录运行，并让 Python 能看到 `src/`：
+
 ```bash
-cd src
-ln -s eas_reader eas_client
+PYTHONPATH=src python -m eas_client.cli folders --json
 ```
 
-**方案 B：统一修改为 eas_reader**
-```bash
-# 将所有 from eas_client. 替换为 from eas_reader.
-find src -name "*.py" -exec sed -i 's/from eas_client\./from eas_reader./g' {} \;
-```
-
-**方案 C：复制目录**
-```bash
-cd src
-cp -r eas_reader eas_client
-```
+如果是仓库根目录脚本，使用项目自带的 `eas_env.add_import_path()`；它会自动把 `src/` 加入 `sys.path`。
 
 ### 2.2 isinstance 检查失败
 
@@ -91,11 +81,11 @@ cp -r eas_reader eas_client
 代码逻辑正确，但 `isinstance(child, WbxmlElement)` 返回 `False`
 
 **原因：**
-- Python 将 `eas_client.wbxml.models.WbxmlElement` 和 `eas_reader.wbxml.models.WbxmlElement` 视为不同类
-- 模块路径不一致导致
+- 同一协议模型被从不同模块路径重复导入
+- 旧版本目录结构同时存在 `eas_reader.*` 和 `eas_client.*` 时，会触发这个问题
 
 **解决方案：**
-确保所有导入统一使用 `eas_client`（通过符号链接或复制目录）。
+统一使用 `eas_client` 命名空间，不要再创建 `eas_reader` 的镜像目录、符号链接或复制副本。
 
 ---
 
@@ -260,10 +250,10 @@ if sync1.sync_key and sync1.sync_key != '0':
 ```bash
 # EAS 办公邮箱配置
 EAS_SERVER=mail.resoftcss.com.cn
-EAS_USERNAME=RESOFT\zhangyanlong
+EAS_USERNAME=RESOFT\用户名
 EAS_PASSWORD=你的密码
-EAS_ACCOUNT_EMAIL=zhangyanlong@resoftcss.com.cn
-EAS_DEVICE_ID=PYEASCLI001
+EAS_ACCOUNT_EMAIL=用户名@resoftcss.com.cn
+EAS_DEVICE_ID=你的设备ID
 EAS_VERIFY_TLS=false
 EAS_DEVICE_TYPE=iPhone
 EAS_USER_AGENT=Apple-iOS/17.0
@@ -346,7 +336,7 @@ print(f"EAS_SERVER: {os.environ.get('EAS_SERVER')}")
 
 ```bash
 # 测试 Basic Auth
-curl -k -u "RESOFT/zhangyanlong:密码" \
+curl -k -u "RESOFT/用户名:密码" \
   -H "User-Agent: Apple-iOS/17.0" \
   "https://mail.resoftcss.com.cn/Microsoft-Server-ActiveSync?Cmd=FolderSync&User=..."
 ```

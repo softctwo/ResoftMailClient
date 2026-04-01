@@ -20,18 +20,18 @@ if env_file.exists():
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from eas_reader.config import ClientConfig
-from eas_reader.eas.commands import (
+from eas_client.config import ClientConfig
+from eas_client.eas.commands import (
     build_provision_request,
     build_folder_sync_request,
     build_sync_request,
     build_ping_request,
 )
-from eas_reader.eas.parsers import (
+from eas_client.eas.parsers import (
     parse_folder_sync_response,
     parse_sync_response,
 )
-from eas_reader.transport import EasTransport
+from eas_client.transport import EasTransport
 import re
 
 
