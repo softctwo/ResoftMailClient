@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""通过 EAS 发送邮件。"""
+"""通过 EAS 发送邮件 - 支持 HTML 模板、附件、抄送。"""
 
 from __future__ import annotations
 
@@ -45,37 +45,46 @@ def build_message(
     from_email: str,
     to_email: str,
     subject: str,
-    body: str,
+    html_body: str,
+    text_body: str,
     cc_email: str | None,
     attachment_paths: list[str] | None,
 ):
+    """构建 multipart/alternative + 附件的 MIME 消息"""
     attachments = attachment_paths or []
-    if attachments:
-        message = MIMEMultipart()
-        message.attach(MIMEText(body, "plain", "utf-8"))
-        for raw_path in attachments:
-            file_path = Path(raw_path)
-            payload = file_path.read_bytes()
-            mime_type, _ = mimetypes.guess_type(str(file_path))
-            subtype = (mime_type or "application/octet-stream").split("/")[-1]
-            part = MIMEApplication(payload, _subtype=subtype)
-            part.add_header("Content-Disposition", "attachment", filename=file_path.name)
-            message.attach(part)
-    else:
-        message = MIMEText(body, "plain", "utf-8")
 
+    # 创建 multipart/mixed 容器（邮件整体）
+    message = MIMEMultipart("mixed")
     message["From"] = from_email
     message["To"] = to_email
     if cc_email:
         message["Cc"] = cc_email
     message["Subject"] = subject
+
+    # 创建 multipart/alternative 容器（HTML + 纯文本）
+    alt_part = MIMEMultipart("alternative")
+    alt_part.attach(MIMEText(text_body, "plain", "utf-8"))
+    alt_part.attach(MIMEText(html_body, "html", "utf-8"))
+    message.attach(alt_part)
+
+    # 添加附件
+    for raw_path in attachments:
+        file_path = Path(raw_path)
+        payload = file_path.read_bytes()
+        mime_type, _ = mimetypes.guess_type(str(file_path))
+        subtype = (mime_type or "application/octet-stream").split("/")[-1]
+        part = MIMEApplication(payload, _subtype=subtype)
+        part.add_header("Content-Disposition", "attachment", filename=file_path.name)
+        message.attach(part)
+
     return message
 
 
 def send_mail(
     to_email: str,
     subject: str,
-    body: str,
+    html_body: str,
+    text_body: str,
     cc_email: str | None = None,
     attachment_paths: list[str] | None = None,
 ) -> dict:
@@ -84,7 +93,7 @@ def send_mail(
     policy_key = get_policy_key(transport)
 
     from_email = config.account_email or f"{config.username}@unknown.local"
-    message = build_message(from_email, to_email, subject, body, cc_email, attachment_paths)
+    message = build_message(from_email, to_email, subject, html_body, text_body, cc_email, attachment_paths)
 
     params = {
         "Cmd": "SendMail",
@@ -123,15 +132,65 @@ def send_mail(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="通过 EAS 发送邮件")
-    parser.add_argument("--to", required=True, help="收件人邮箱")
-    parser.add_argument("--subject", required=True, help="邮件主题")
-    parser.add_argument("--body", required=True, help="邮件正文")
+    from mail_templates import list_templates, render_template, TEMPLATES
+
+    parser = argparse.ArgumentParser(description="通过 EAS 发送邮件（支持 HTML 模板）")
+    parser.add_argument("--to", default=None, help="收件人邮箱")
+    parser.add_argument("--subject", default=None, help="邮件主题")
+    parser.add_argument("--body", default=None, help="邮件正文（支持换行符 \\n）")
     parser.add_argument("--cc", default=None, help="抄送邮箱")
     parser.add_argument("--attach", action="append", default=[], help="附件路径，可重复传入")
+
+    # 模板相关参数
+    parser.add_argument("--template", default="simple", choices=list(TEMPLATES.keys()),
+                        help="邮件模板类型")
+    parser.add_argument("--title", default="", help="模板标题（默认使用 --subject）")
+    parser.add_argument("--recipient-name", default="", help="收件人称呼")
+    parser.add_argument("--sender-name", default="", help="发件人署名")
+    parser.add_argument("--subtitle", default="", help="副标题")
+    parser.add_argument("--highlight", default="", help="高亮提示内容")
+    parser.add_argument("--detail-rows", default="", help="表格行 HTML（仅 project/finance 模板）")
+    parser.add_argument("--list-templates", action="store_true", help="列出可用模板并退出")
+
     args = parser.parse_args()
 
-    result = send_mail(args.to, args.subject, args.body, args.cc, args.attach)
+    if args.list_templates:
+        for t in list_templates():
+            print(f"\n【{t['name']}】{t['description']}")
+            print(f"  主题前缀: {t['subject_prefix'] or '(无)'}")
+        return
+
+    if not args.to or not args.subject or not args.body:
+        parser.error("发送邮件时必须提供 --to、--subject、--body")
+
+    # 将命令行中字面的 \n 转换为真正的换行符（所有文本参数统一处理）
+    def _fix_nl(s: str) -> str:
+        return s.replace("\\n", "\n") if s else s
+
+    body = _fix_nl(args.body)
+    highlight = _fix_nl(args.highlight)
+    subtitle = _fix_nl(args.subtitle)
+    title = _fix_nl(args.title)
+    detail_rows = _fix_nl(args.detail_rows)
+    recipient_name = _fix_nl(args.recipient_name)
+    sender_name = _fix_nl(args.sender_name)
+
+    tmpl = TEMPLATES.get(args.template, TEMPLATES["simple"])
+    subject = tmpl.subject_prefix + args.subject
+    title = title or args.subject
+
+    html_body, text_body = render_template(
+        template_name=args.template,
+        title=title,
+        content=body,
+        sender_name=sender_name,
+        recipient_name=recipient_name,
+        subtitle=subtitle,
+        highlight=highlight,
+        detail_rows=detail_rows,
+    )
+
+    result = send_mail(args.to, subject, html_body, text_body, args.cc, args.attach)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

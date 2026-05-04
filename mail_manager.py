@@ -11,6 +11,7 @@ import json
 import re
 import sys
 import warnings
+from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -133,6 +134,15 @@ def get_transport():
     if not pk2_list:
         raise RuntimeError("Provision 第二步未返回 PolicyKey")
 
+    # 设置 PolicyKey 到 transport，确保后续请求头携带
+    transport.config = ClientConfig(
+        **{k: getattr(config, k) for k in [
+            "server", "username", "password", "account_email", "device_id",
+            "device_type", "user_agent", "protocol_version", "endpoint_path",
+            "ews_endpoint_path", "use_tls", "verify_tls", "timeout"
+        ]},
+        policy_key=pk2_list[0].decode(),
+    )
     return transport
 
 
@@ -262,6 +272,16 @@ def sync_all(max_emails=0, download_body=True):
         filename = make_mail_filename(msg)
         filepath = ARCHIVE_DIR / folder / filename
         
+        # 附件信息
+        att_list = []
+        for att in (msg.attachments or []):
+            att_list.append({
+                "display_name": att.display_name,
+                "file_reference": att.file_reference,
+                "size": att.size,
+                "content_type": att.content_type,
+            })
+
         # 基本信息写入索引
         email_data = {
             "server_id": mid,
@@ -272,6 +292,7 @@ def sync_all(max_emails=0, download_body=True):
             "folder": folder,
             "filename": filename,
             "has_body": False,
+            "attachments": att_list,
         }
         
         # 下载正文
@@ -365,6 +386,16 @@ def sync_incremental():
         category, folder = get_category(subject)
         filename = make_mail_filename(msg)
         
+        # 附件信息
+        att_list = []
+        for att in (msg.attachments or []):
+            att_list.append({
+                "display_name": att.display_name,
+                "file_reference": att.file_reference,
+                "size": att.size,
+                "content_type": att.content_type,
+            })
+
         email_data = {
             "server_id": mid,
             "subject": subject,
@@ -374,6 +405,7 @@ def sync_incremental():
             "folder": folder,
             "filename": filename,
             "has_body": False,
+            "attachments": att_list,
         }
         
         # 下载正文
@@ -509,17 +541,110 @@ def search_emails(index: dict, query: str) -> list:
     return sorted(results, key=lambda x: x.get("received_at", ""), reverse=True)
 
 
+def aggregate_by_sender(index: dict, limit: int = 20) -> dict:
+    """按发件人聚合邮件"""
+    sender_emails = defaultdict(list)
+    for mid, email in index.get("emails", {}).items():
+        sender = email.get("sender", "未知")
+        name_match = re.match(r'"?([^"<\n]+)"?', sender)
+        name = name_match.group(1).strip() if name_match else sender[:20]
+        sender_emails[name].append(email)
+    # 排序
+    for name in sender_emails:
+        sender_emails[name].sort(key=lambda x: x.get("received_at", ""), reverse=True)
+    # 取top
+    sorted_senders = sorted(sender_emails.items(), key=lambda x: -len(x[1]))[:limit]
+    return dict(sorted_senders)
+
+
+def aggregate_by_project(index: dict) -> dict:
+    """按项目编号/名称聚合邮件"""
+    from analysis_rules import extract_project_info
+    project_emails = defaultdict(list)
+    for mid, email in index.get("emails", {}).items():
+        subject = email.get("subject", "")
+        info = extract_project_info(subject)
+        code = info.get("project_code")
+        name = info.get("project_name")
+        if code:
+            key = f"{name or '未知项目'} ({code})"
+        else:
+            # 尝试匹配常见项目名
+            key = None
+            for pattern in [
+                r"(北京银行[^-|】]+)", r"(恒生银行[^-|】]+)", r"(法兴银行[^-|】]+)",
+                r"(稠州银行[^-|】]+)", r"(鞍钢[^-|】]+)", r"(中国建材[^-|】]+)",
+                r"(天津农发行[^-|】]+)", r"(平安信托[^-|】]+)", r"(格力财务[^-|】]+)",
+                r"(国家开发银行[^-|】]+)", r"(湖北农信[^-|】]+)", r"(徐工集团[^-|】]+)",
+                r"(中建材[^-|】]+)", r"(德意志银行[^-|】]+)", r"(柳州银行[^-|】]+)",
+            ]:
+                match = re.search(pattern, subject)
+                if match:
+                    key = match.group(1).strip("【】 ")
+                    break
+            if not key:
+                continue
+        project_emails[key].append(email)
+    for k in project_emails:
+        project_emails[k].sort(key=lambda x: x.get("received_at", ""), reverse=True)
+    return dict(sorted(project_emails.items(), key=lambda x: -len(x[1])))
+
+
+def detect_missing_weekly(index: dict, days: int = 7) -> list[dict]:
+    """检测本周未提交周报的人员"""
+    now = datetime.now()
+    week_start = now - timedelta(days=now.weekday())
+    week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 收集本周周报
+    weekly_senders = set()
+    for mid, email in index.get("emails", {}).items():
+        if email.get("category") != "周报日报":
+            continue
+        received = email.get("received_at", "")
+        try:
+            dt = datetime.fromisoformat(received.replace("Z", "+00:00")).replace(tzinfo=None)
+            if dt >= week_start:
+                sender = email.get("sender", "")
+                name_match = re.match(r'"?([^"<\n]+)"?', sender)
+                name = name_match.group(1).strip() if name_match else sender[:20]
+                weekly_senders.add(name)
+        except (ValueError, TypeError):
+            continue
+
+    # 历史发过周报的人（作为基准名单）
+    historical_weekly_senders = defaultdict(int)
+    for mid, email in index.get("emails", {}).items():
+        if email.get("category") != "周报日报":
+            continue
+        sender = email.get("sender", "")
+        name_match = re.match(r'"?([^"<\n]+)"?', sender)
+        name = name_match.group(1).strip() if name_match else sender[:20]
+        historical_weekly_senders[name] += 1
+
+    # 找出常发周报但本周没发的人
+    missing = []
+    for name, count in historical_weekly_senders.items():
+        if count >= 2 and name not in weekly_senders:
+            missing.append({"name": name, "historical_count": count})
+    missing.sort(key=lambda x: -x["historical_count"])
+    return missing
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="EAS 邮件管理器")
     parser.add_argument("action", choices=[
-        "sync-all", "sync-incremental", "report", "stats", "search"
+        "sync-all", "sync-incremental", "report", "stats", "search",
+        "by-sender", "by-project", "missing-weekly",
     ])
     parser.add_argument("--max", type=int, default=0, help="最大下载数量 (0=全部)")
     parser.add_argument("--no-body", action="store_true", help="不下载正文（仅索引）")
     parser.add_argument("--type", default="daily", help="报告类型: daily/weekly/monthly")
     parser.add_argument("--date", default=None, help="日期 YYYY-MM-DD")
     parser.add_argument("--query", default=None, help="搜索关键词")
+    parser.add_argument("--limit", type=int, default=20, help="聚合结果数量限制")
+    parser.add_argument("--days", type=int, default=7, help="周报检测时间窗口(天)")
     
     args = parser.parse_args()
     
@@ -549,3 +674,28 @@ if __name__ == "__main__":
         for r in results[:20]:
             print(f"  [{r.get('received_at', '')[:10]}] {r.get('subject', '')[:60]}")
             print(f"    {r.get('sender', '')[:30]} | {r.get('category', '')}")
+    elif args.action == "by-sender":
+        index = load_index()
+        grouped = aggregate_by_sender(index, limit=args.limit)
+        print(f"# 按发件人聚合 (Top {len(grouped)})")
+        for name, emails in grouped.items():
+            print(f"\n## {name} ({len(emails)} 封)")
+            for e in emails[:5]:
+                print(f"  [{e.get('received_at', '')[:10]}] {e.get('subject', '')[:55]}")
+    elif args.action == "by-project":
+        index = load_index()
+        grouped = aggregate_by_project(index)
+        print(f"# 按项目聚合 ({len(grouped)} 个项目)")
+        for proj, emails in grouped.items():
+            print(f"\n## {proj} ({len(emails)} 封)")
+            for e in emails[:5]:
+                print(f"  [{e.get('received_at', '')[:10]}] {e.get('subject', '')[:55]}")
+    elif args.action == "missing-weekly":
+        index = load_index()
+        missing = detect_missing_weekly(index, days=args.days)
+        print(f"# 本周未提交周报人员 ({len(missing)} 人)")
+        if not missing:
+            print("所有人已提交周报 👍")
+        else:
+            for m in missing[:20]:
+                print(f"- {m['name']} (历史提交 {m['historical_count']} 次)")
